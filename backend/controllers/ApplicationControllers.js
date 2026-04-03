@@ -41,20 +41,26 @@ export const JoinRequest = async (req, res) => {
     const { data } = req.body;
     const { joinid } = req.params;
     const adminId = req.user.id;
+    let accepted = false;
+
+    const checkrequest = await prisma.joinrequest.findFirst({
+        where: {
+            id: joinid
+        }
+    })
+    if (!checkrequest) {
+        return res.status(400).json({ message: "request not found" })
+    }
 
     const checkauth = await prisma.idea.findFirst({
         where: {
-            ownerId: adminId
+            ownerId: adminId,
+            id: checkrequest.ideaId
         }
     })
-    const checkrequest = await prisma.joinrequest.findFirst({
-        where: {
-            id: joinid,
-            ideaId: checkauth.id
-        }
-    })
-    if (!checkrequest && !checkauth) {
-        return res.status(400).json({ message: "something went wrong please try again" })
+
+    if (!checkauth) {
+        return res.status(400).json({ message: "admin not found" })
     }
 
     if (data === "accepted") {
@@ -66,7 +72,14 @@ export const JoinRequest = async (req, res) => {
                 status: "accepted"
             }
         })
-        return res.status(200).json({ message: "request has been approved" })
+
+        const addMember = await prisma.member.create({
+            data: {
+                memberId: checkrequest.userId,
+                ideaId: checkauth.id
+            }
+        })
+        return res.status(200).json({ message: "request has been accepted" })
     }
     else if (data === "rejected") {
         const reject = await prisma.joinrequest.update({
