@@ -1,0 +1,140 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                  String           @id @default(uuid())
+  email               String           @unique
+  password            String
+  twoFactorSecret     String?
+  twoFactorEnabled    Boolean          @default(false)
+  ban                 Boolean          @default(false)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  deletedAt           DateTime?
+  profiles            Profile[]
+  ideas               Idea[]
+  members             Member[]
+  joinrequests        Joinrequest[]
+  projectmessages     Projectmessage[]
+  UserThatReports     Report[]         @relation("UserThatReports")
+  UserThatGotReported Report[]         @relation("UserThatGotReported")
+}
+
+model Profile {
+  id           String    @id @default(uuid())
+  displayname  String
+  userId       String
+  skills       String[]
+  availability available
+  country      String
+  bio          String
+  profileImage String?
+  user         User      @relation(fields: [userId], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+}
+
+enum available {
+  fulltime
+  parttime
+  student
+}
+
+model Idea {
+  id               String           @id @default(uuid())
+  ownerId          String
+  Title            String
+  Description      String
+  category         String[]
+  RequiredSkills   String[]
+  peopleNeeded     String[]
+  status           status
+  budget           Int
+  MaxNumberMembers Int
+  user             User             @relation(fields: [ownerId], references: [id])
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+  joinrequests     Joinrequest[]
+  projectmessages  Projectmessage[]
+  reports          Report[]
+  members          Member[]
+}
+
+enum status {
+  open
+  closed
+  inprogress
+}
+
+model Member {
+  id        String    @id @default(uuid())
+  memberId  String
+  ideaId    String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  ref       User      @relation(fields: [memberId], references: [id])
+  idea      Idea      @relation(fields: [ideaId], references: [id])
+}
+
+model Joinrequest {
+  id        String    @id @default(uuid())
+  status    joining   @default(pending)
+  ideaId    String
+  userId    String
+  id1       Idea      @relation(fields: [ideaId], references: [id])
+  id2       User      @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+}
+
+enum joining {
+  pending
+  accepted
+  rejected
+}
+
+model Projectmessage {
+  id        String    @id @default(uuid())
+  ideaId    String
+  userId    String
+  content   String
+  id1       Idea      @relation(fields: [ideaId], references: [id])
+  id2       User      @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+}
+
+model Report {
+  id           String       @id @default(uuid())
+  reporterId   String
+  targetuserId String?
+  targetideaId String?
+  reason       String?
+  status       reportstatus
+  id1          User         @relation("UserThatReports", fields: [reporterId], references: [id])
+  id2          User?        @relation("UserThatGotReported", fields: [targetuserId], references: [id])
+  id3          Idea?        @relation(fields: [targetideaId], references: [id])
+}
+
+enum reportstatus {
+  pending
+  resolved
+  ignored
+}
