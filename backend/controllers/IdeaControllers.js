@@ -1,4 +1,4 @@
-import { type } from "node:os";
+
 import { prisma } from "../lib/prisma.js";
 
 export const PostIdea = async (req, res) => {

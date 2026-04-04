@@ -3,9 +3,11 @@ import { validationResult, check } from "express-validator";
 export const validate = {
     register: [
         check('email')
+            .trim()
             .notEmpty()
             .withMessage('email is required'),
         check("password")
+            .trim()
             .notEmpty()
             .withMessage('password is required')
             .isLength({ min: 8 })
@@ -13,21 +15,25 @@ export const validate = {
     ],
     Login: [
         check("password")
+            .trim()
             .notEmpty()
             .withMessage("password is required")
             .isLength({ min: 8 })
             .withMessage("password must be 8 caracters"),
         check("email")
+            .trim()
             .notEmpty()
             .withMessage("email is required"),
     ],
     Reset: [
         check("password")
+            .trim()
             .notEmpty()
             .withMessage("password is required")
             .isLength({ min: 8 })
             .withMessage("password must be 8 caracters"),
         check("new_password")
+            .trim()
             .notEmpty()
             .withMessage("password is required")
             .isLength({ min: 8 })
@@ -35,11 +41,13 @@ export const validate = {
     ],
     forgetpassword: [
         check("email")
+            .trim()
             .notEmpty()
             .withMessage("email is required"),
     ],
     ResetForgottenPassword: [
         check("password")
+            .trim()
             .notEmpty()
             .withMessage("password is required")
             .isLength({ min: 8 })
