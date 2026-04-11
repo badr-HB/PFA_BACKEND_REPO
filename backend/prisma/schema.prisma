@@ -1,83 +1,124 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../generated/prisma"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
-model User {
-  id                  String           @id @default(uuid())
-  email               String           @unique
-  password            String
-  twoFactorSecret     String?
-  twoFactorEnabled    Boolean          @default(false)
-  ban                 Boolean          @default(false)
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
-  deletedAt           DateTime?
-  profiles            Profile[]
-  ideas               Idea[]
-  members             Member[]
-  joinrequests        Joinrequest[]
-  projectmessages     Projectmessage[]
-  UserThatReports     Report[]         @relation("UserThatReports")
-  UserThatGotReported Report[]         @relation("UserThatGotReported")
+// ─── Enums ───────────────────────────────────────────────
+
+enum Role {
+  user
+  admin
 }
 
-model Profile {
-  id           String    @id @default(uuid())
-  displayname  String
-  userId       String
-  skills       String[]
-  availability available
-  country      String
-  bio          String
-  profileImage String?
-  user         User      @relation(fields: [userId], references: [id])
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime?
-}
-
-enum available {
+enum Availability {
   fulltime
   parttime
   student
 }
 
-model Idea {
-  id               String           @id @default(uuid())
-  ownerId          String
-  Title            String
-  Description      String
-  category         String[]
-  RequiredSkills   String[]
-  peopleNeeded     String[]
-  status           status
-  budget           Int
-  MaxNumberMembers Int
-  user             User             @relation(fields: [ownerId], references: [id])
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  deletedAt        DateTime?
-  joinrequests     Joinrequest[]
-  projectmessages  Projectmessage[]
-  reports          Report[]
-  members          Member[]
-}
-
-enum status {
+enum IdeaStatus {
   open
   closed
   inprogress
+}
+
+enum JoinStatus {
+  pending
+  accepted
+  rejected
+}
+
+enum ReportStatus {
+  pending
+  resolved
+  ignored
+}
+
+enum NotificationType {
+  join_request
+  accepted
+  rejected
+  message
+}
+
+// ─── Models ──────────────────────────────────────────────
+
+model User {
+  id               String         @id @default(uuid())
+  email            String         @unique
+  name             String
+  password         String
+  role             Role           @default(user)
+  ban              Boolean        @default(false)
+  twoFactorSecret  String?
+  twoFactorEnabled Boolean        @default(false)
+  emailVerified    Boolean        @default(false)
+  verifyCode       String?
+  verifyCodeExpiry DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  deletedAt        DateTime?
+
+  profile          Profile?
+  ideas            Idea[]
+  members          Member[]
+  joinrequests     Joinrequest[]
+  projectmessages  Projectmessage[]
+  notifications    Notification[]
+  sentMessages     Message[]      @relation("SentMessages")
+  receivedMessages Message[]      @relation("ReceivedMessages")
+  savedIdeas       Saved[]
+  reports          Report[]       @relation("UserThatReports")
+  reportedBy       Report[]       @relation("UserThatGotReported")
+}
+
+model Profile {
+  id           String       @id @default(uuid())
+  userId       String       @unique
+  username     String       @unique
+  displayname  String
+  skills       String[]
+  availability Availability @default(student)
+  city         String
+  country      String       @default("")
+  bio          String       @default("")
+  profileImage String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  deletedAt    DateTime?
+
+  user         User         @relation(fields: [userId], references: [id])
+}
+
+model Idea {
+  id          String         @id @default(uuid())
+  ownerId     String
+  title       String
+  description String
+  sector      String[]
+  skills      String[]
+  teamNeeded  String[]
+  status      IdeaStatus     @default(open)
+  budget      Int            @default(0)
+  city        String         @default("")
+  maxMembers  Int            @default(5)
+  viewCount   Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?
+
+  user            User             @relation(fields: [ownerId], references: [id])
+  joinrequests    Joinrequest[]
+  projectmessages Projectmessage[]
+  reports         Report[]
+  members         Member[]
+  savedBy         Saved[]
 }
 
 model Member {
@@ -87,26 +128,23 @@ model Member {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
-  ref       User      @relation(fields: [memberId], references: [id])
-  idea      Idea      @relation(fields: [ideaId], references: [id])
+
+  user User @relation(fields: [memberId], references: [id])
+  idea Idea @relation(fields: [ideaId], references: [id])
 }
 
 model Joinrequest {
-  id        String    @id @default(uuid())
-  status    joining   @default(pending)
+  id        String     @id @default(uuid())
+  status    JoinStatus @default(pending)
   ideaId    String
   userId    String
-  id1       Idea      @relation(fields: [ideaId], references: [id])
-  id2       User      @relation(fields: [userId], references: [id])
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  message   String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
   deletedAt DateTime?
-}
 
-enum joining {
-  pending
-  accepted
-  rejected
+  idea Idea @relation(fields: [ideaId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 }
 
 model Projectmessage {
@@ -114,27 +152,64 @@ model Projectmessage {
   ideaId    String
   userId    String
   content   String
-  id1       Idea      @relation(fields: [ideaId], references: [id])
-  id2       User      @relation(fields: [userId], references: [id])
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
+
+  idea Idea @relation(fields: [ideaId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  content    String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sender   User @relation("SentMessages", fields: [senderId], references: [id])
+  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  link      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Saved {
+  id        String   @id @default(uuid())
+  userId    String
+  ideaId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  idea Idea @relation(fields: [ideaId], references: [id])
+
+  @@unique([userId, ideaId])
 }
 
 model Report {
   id           String       @id @default(uuid())
   reporterId   String
-  targetuserId String?
-  targetideaId String?
+  targetUserId String?
+  targetIdeaId String?
   reason       String?
-  status       reportstatus
-  id1          User         @relation("UserThatReports", fields: [reporterId], references: [id])
-  id2          User?        @relation("UserThatGotReported", fields: [targetuserId], references: [id])
-  id3          Idea?        @relation(fields: [targetideaId], references: [id])
-}
+  status       ReportStatus @default(pending)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
-enum reportstatus {
-  pending
-  resolved
-  ignored
+  reporter   User  @relation("UserThatReports", fields: [reporterId], references: [id])
+  targetUser User? @relation("UserThatGotReported", fields: [targetUserId], references: [id])
+  targetIdea Idea? @relation(fields: [targetIdeaId], references: [id])
 }
